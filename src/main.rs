@@ -1,4 +1,4 @@
-use image::imageops;
+use image::{imageops,RgbaImage, Rgba, ImageBuffer, GenericImage};
 use ndarray::{Array, CowArray};
 use ort::{
     Environment, ExecutionProvider, GraphOptimizationLevel, SessionBuilder, Value,
@@ -112,14 +112,14 @@ fn main() -> Result<()> {
         }
 
 // Resize the final output image back to the original size if possible using the scaling factor
-        let output_img = imageops::resize(
+        let mut output_img = imageops::resize(
             &resized_img,
             (input_img.width() as f32 * scaling_factor) as u32,
             (input_img.height() as f32 * scaling_factor) as u32,
             imageops::FilterType::Triangle,
         );
 
-        output_img.save(output_img_file)?;
+        output_img.save(&output_img_file)?;
 		
         let elapsed_time = start_time.elapsed();
         println!(
@@ -128,7 +128,56 @@ fn main() -> Result<()> {
             elapsed_time.as_secs(),
             elapsed_time.subsec_millis()
         );
+        let alpha_bounds = find_alpha_bounds(&output_img);
+
+        if let Some((min_x, min_y, max_x, max_y)) = alpha_bounds {
+            let cropped_img = imageops::crop(&mut output_img, min_x, min_y, max_x - min_x, max_y - min_y).to_image();
+    // Convert the cropped image to a full image
+    let mut full_cropped_img = ImageBuffer::new(max_x - min_x, max_y - min_y);
+    full_cropped_img.copy_from(&cropped_img, 0, 0);
+
+        // Modify the output file path to include "_cropped" before the extension
+        let mut output_img_file_cropped = output_img_file.clone();
+        if let Some(extension) = output_img_file_cropped.extension() {
+            let file_stem = output_img_file_cropped.file_stem().unwrap();
+            let new_file_stem = format!("{}_cropped", file_stem.to_str().unwrap());
+            output_img_file_cropped.set_file_name(new_file_stem);
+        }
+    
+        // Append the original extension to the modified output file path
+        if let Some(extension) = output_img_file.extension() {
+            output_img_file_cropped.set_extension(extension);
+        }
+
+    // Save the cropped image
+    full_cropped_img.save(output_img_file_cropped)?;
+        }
+
     }
 
     Ok(())
+}
+
+// Function to find the bounding box containing non-transparent pixels
+fn find_alpha_bounds(image: &RgbaImage) -> Option<(u32, u32, u32, u32)> {
+    let mut min_x = u32::MAX;
+    let mut max_x = 0;
+    let mut min_y = u32::MAX;
+    let mut max_y = 0;
+
+    for (x, y, pixel) in image.enumerate_pixels() {
+        if pixel[3] != 0 {
+            // Non-transparent pixel
+            min_x = min_x.min(x);
+            max_x = max_x.max(x);
+            min_y = min_y.min(y);
+            max_y = max_y.max(y);
+        }
+    }
+
+    if min_x <= max_x && min_y <= max_y {
+        Some((min_x, min_y, max_x, max_y))
+    } else {
+        None
+    }
 }
