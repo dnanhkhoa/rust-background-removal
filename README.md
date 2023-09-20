@@ -4,6 +4,8 @@
 
 This Rust implementation is a minimal port of the original JavaScript library `@imgly/background-removal`. It aims to explore **the use of ONNX models in Rust** for background removal tasks. If you're interested in the full capabilities and details of the background removal process, I highly recommend checking out the original JavaScript library's [README](https://github.com/imgly/background-removal-js) here.
 
+**Update:** For the technical details of the model, please check out the paper mentioned in [this repository](https://github.com/xuebinqin/DIS).
+
 ## Usage
 
 ```sh
