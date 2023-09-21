@@ -18,6 +18,10 @@ This Rust implementation is a minimal port of the original JavaScript library `@
 cargo run --release
 ```
 
+## Limitations
+
+The model resolution is limited to a maximum of 1024x1024 pixels.
+
 ## License
 
 [GNU GPLv3](https://choosealicense.com/licenses/gpl-3.0/)
