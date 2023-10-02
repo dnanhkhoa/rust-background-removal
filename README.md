@@ -4,6 +4,8 @@
 
 This Rust implementation is a minimal port of the original JavaScript library `@imgly/background-removal`. It aims to explore **the use of ONNX models in Rust** for background removal tasks. If you're interested in the full capabilities and details of the background removal process, I highly recommend checking out the original JavaScript library's [README](https://github.com/imgly/background-removal-js) here.
 
+**Update:** For the technical details of the model, please check out the paper **Highly Accurate Dichotomous Image Segmentation** mentioned in [this repository](https://github.com/xuebinqin/DIS).
+
 ## Usage
 
 ```sh
@@ -17,7 +19,12 @@ cargo run --release
 ```
 
 ## Related sites
+[xuebinqin/DIS](https://github.com/xuebinqin/DIS) Highly Accurate Dichotomous Image Segmentation
 [pykeio/ort: A Rust wrapper for ONNX Runtime](https://github.com/pykeio/ort)
+
+## Limitations
+The model resolution is limited to a maximum of 1024x1024 pixels.
+
 
 ## License
 
