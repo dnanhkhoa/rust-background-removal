@@ -16,9 +16,10 @@ This Rust implementation is a minimal port of the original JavaScript library `@
 cargo run --release
 ```
 
-## Related sites
-[pykeio/ort: A Rust wrapper for ONNX Runtime](https://github.com/pykeio/ort)
-
 ## License
 
 [GNU GPLv3](https://choosealicense.com/licenses/gpl-3.0/)
+
+## Related sites
+[pykeio/ort: A Rust wrapper for ONNX Runtime](https://github.com/pykeio/ort)
+
