@@ -36,6 +36,7 @@ struct App {
 }
 
 fn main() -> Result<()> {
+    tracing_subscriber::fmt::init();
     let args = App::parse();
 
     let session = onnx_session()?;
