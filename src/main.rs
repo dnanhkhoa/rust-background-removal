@@ -1,22 +1,20 @@
 use anyhow::{Context, Result};
 use clap::Parser;
-use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, Request, Response, Server};
+
 use image::io::Reader as ImageReader;
-use image::{imageops, GenericImage, ImageBuffer, Rgba, RgbaImage};
+use image::{imageops, GenericImage, ImageBuffer, RgbaImage};
 use image::{DynamicImage, ImageFormat};
 use infer::image::is_jpeg;
-use multer::Multipart;
+
 use ndarray::{Array, CowArray};
 use once_cell::sync::OnceCell;
-use ort::{Environment, ExecutionProvider, GraphOptimizationLevel, SessionBuilder, Value};
-use std::convert::Infallible;
+use ort::Value;
+
 use std::fs;
 use std::io::{self, Cursor, Read, Write};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 // use tokio::io::AsyncWriteExt;
-use std::net::Ipv4Addr;
 
 mod http;
 mod onnx;

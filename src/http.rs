@@ -8,18 +8,13 @@ use image::{imageops, GenericImage, ImageBuffer, Rgba, RgbaImage};
 use image::{DynamicImage, ImageFormat};
 use infer::image::is_jpeg;
 use multer::Multipart;
-use ndarray::{Array, CowArray};
-use once_cell::sync::OnceCell;
-use ort::{Environment, ExecutionProvider, GraphOptimizationLevel, SessionBuilder, Value};
+
 use std::convert::Infallible;
-use std::fs;
-use std::io::{self, Cursor, Read, Write};
-use std::path::{Path, PathBuf};
-use std::time::Instant;
+
+use std::io::{self, Cursor, Read};
+
 // use tokio::io::AsyncWriteExt;
 use std::net::Ipv4Addr;
-
-
 
 pub async fn start_http_server(args: &App) -> Result<(), anyhow::Error> {
     let session = crate::onnx::onnx_session(&args.model).unwrap();
@@ -36,14 +31,14 @@ pub async fn start_http_server(args: &App) -> Result<(), anyhow::Error> {
             let addr: [u8; 4] = octets.into();
             let addr = (addr, args.port).into();
             let server = Server::bind(&addr).serve(make_svc);
-            println!("Listening on http://{}:{}/",args.address,args.port);
+            println!("Listening on http://{}:{}/", args.address, args.port);
             server.await?;
         }
         Err(_) => {
             println!("Invalid IP address");
         }
     }
-        // Access the parsed values
+    // Access the parsed values
     Ok(())
 }
 

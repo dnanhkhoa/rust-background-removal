@@ -1,5 +1,4 @@
-use ort::{Environment, SessionBuilder, GraphOptimizationLevel, ExecutionProvider};
-
+use ort::{Environment, ExecutionProvider, GraphOptimizationLevel, SessionBuilder};
 
 pub(crate) fn onnx_session(onnx_model_file: &str) -> Result<ort::Session, anyhow::Error> {
     let environment = Environment::default().into_arc();
