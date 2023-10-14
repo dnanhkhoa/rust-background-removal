@@ -15,9 +15,11 @@ use std::fs;
 use std::io::{self, Cursor, Read, Write};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
-use tokio::io::AsyncWriteExt;
+// use tokio::io::AsyncWriteExt;
+use std::net::Ipv4Addr;
 
 static SESSION: OnceCell<ort::Session> = OnceCell::new();
+static THRESHOLD_BG: OnceCell<u8> = OnceCell::new();
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -43,6 +45,12 @@ struct App {
     stdout: bool, // Flag to write cropped image to stdout
     #[clap(short = 'H', long)]
     http: bool,
+    #[clap(short, long, default_value = "0.0.0.0")]
+    address: String,
+    #[clap(short, long, default_value = "9876")]
+    port: u16,
+    #[clap(short, long, default_value = "10")]
+    threshold_bg: u8,
 }
 
 //#[tokio::main(flavor = "current_thread")]
@@ -50,9 +58,10 @@ struct App {
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
     let args = App::parse();
+    THRESHOLD_BG.set(args.threshold_bg).ok();
 
     if args.http {
-        start_http_server().await?;
+        start_http_server(&args).await?;
     }
     let session = onnx_session()?;
 
@@ -252,9 +261,10 @@ fn find_alpha_bounds(image: &RgbaImage) -> Option<(u32, u32, u32, u32)> {
     let mut max_x = 0;
     let mut min_y = u32::MAX;
     let mut max_y = 0;
+    let thres_b = THRESHOLD_BG.get().unwrap();
 
     for (x, y, pixel) in image.enumerate_pixels() {
-        if pixel[3] > 10 {
+        if pixel[3] > *thres_b {
             // Non-transparent pixel
             min_x = min_x.min(x);
             max_x = max_x.max(x);
@@ -317,7 +327,7 @@ fn process_dynamic_image(
     Ok(DynamicImage::ImageRgba8(output_img))
 }
 
-async fn start_http_server() -> Result<(), anyhow::Error> {
+async fn start_http_server(args: &App) -> Result<(), anyhow::Error> {
     let session = onnx_session().unwrap();
     SESSION.set(session).ok();
     // Define a closure to handle incoming HTTP requests
@@ -325,10 +335,21 @@ async fn start_http_server() -> Result<(), anyhow::Error> {
         Ok::<_, Infallible>(service_fn(move |req| handle_post(req)))
     });
 
-    let addr = ([0, 0, 0, 0], 9876).into();
-    let server = Server::bind(&addr).serve(make_svc);
-    println!("Listening on http://127.0.0.1:9876/");
-    server.await?;
+    let ip_address = args.address.parse::<Ipv4Addr>();
+    match ip_address {
+        Ok(ip) => {
+            let octets = ip.octets();
+            let addr: [u8; 4] = octets.into();
+            let addr = (addr, args.port).into();
+            let server = Server::bind(&addr).serve(make_svc);
+            println!("Listening on http://{}:{}/",args.address,args.port);
+            server.await?;
+        }
+        Err(_) => {
+            println!("Invalid IP address");
+        }
+    }
+        // Access the parsed values
     Ok(())
 }
 
@@ -352,7 +373,7 @@ async fn handle_post(req: Request<Body>) -> Result<Response<Body>, hyper::Error>
                 };
 
                 let mut multipart = Multipart::new(req.into_body(), &boundary);
-                while let Some(mut field) = multipart.next_field().await.unwrap() {
+                while let Some(field) = multipart.next_field().await.unwrap() {
                     let has_filename = field.file_name().map(|s| s.to_string());
                     if let Some(file_name) = has_filename {
                         let buffer = field.bytes().await.unwrap();
@@ -376,7 +397,6 @@ async fn handle_post(req: Request<Body>) -> Result<Response<Body>, hyper::Error>
                         };
 
                         if img.is_some() {
-                            let w = &img.clone().unwrap().clone().width();
                             println!("f: {}", file_name);
                             let processed_dynamic_img =
                                 process_dynamic_image(session, img.unwrap()).unwrap();
