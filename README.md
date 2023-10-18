@@ -24,7 +24,7 @@ The model resolution is limited to a maximum of 1024x1024 pixels.
 
 ## License
 
-[GNU GPLv3](https://choosealicense.com/licenses/gpl-3.0/)
+[MIT](https://choosealicense.com/licenses/mit/)
 
 ## Related sites
 [pykeio/ort: A Rust wrapper for ONNX Runtime](https://github.com/pykeio/ort)
