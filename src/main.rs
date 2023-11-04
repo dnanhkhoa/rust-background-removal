@@ -1,19 +1,30 @@
 use anyhow::{Context, Result};
 use clap::Parser;
+
 use image::io::Reader as ImageReader;
 use image::{imageops, GenericImage, ImageBuffer, RgbaImage};
 use image::{DynamicImage, ImageFormat};
 use infer::image::is_jpeg;
+
 use ndarray::{Array, CowArray};
-use ort::{Environment, ExecutionProvider, GraphOptimizationLevel, SessionBuilder, Value};
+use once_cell::sync::OnceCell;
+use ort::Value;
+
 use std::fs;
 use std::io::{self, Cursor, Read, Write};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
+// use tokio::io::AsyncWriteExt;
+
+mod http;
+mod onnx;
+
+static SESSION: OnceCell<ort::Session> = OnceCell::new();
+static THRESHOLD_BG: OnceCell<u8> = OnceCell::new();
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
-struct App {
+pub struct App {
     #[clap(short, long, value_name = "INPUT_FILE", default_value = "")]
     input_file: String,
     #[clap(
@@ -33,12 +44,29 @@ struct App {
     stdin: bool, // Flag to read image from stdin
     #[clap(short = 's', long, conflicts_with("output_file"))]
     stdout: bool, // Flag to write cropped image to stdout
+    #[clap(short = 'H', long)]
+    http: bool,
+    #[clap(short, long, default_value = "0.0.0.0")]
+    address: String,
+    #[clap(short, long, default_value = "9876")]
+    port: u16,
+    #[clap(short, long, default_value = "10")]
+    threshold_bg: u8,
+    #[clap(short, long, default_value = "assets/medium.onnx")]
+    model: String,
 }
 
-fn main() -> Result<()> {
+//#[tokio::main(flavor = "current_thread")]
+#[tokio::main(worker_threads = 10)]
+async fn main() -> Result<()> {
+    tracing_subscriber::fmt::init();
     let args = App::parse();
+    THRESHOLD_BG.set(args.threshold_bg).ok();
 
-    let session = onnx_session()?;
+    if args.http {
+        http::start_http_server(&args).await?;
+    }
+    let session = onnx::onnx_session(&args.model)?;
 
     // Determine the source of the input image
     let img: Option<DynamicImage> = if args.stdin {
@@ -163,7 +191,6 @@ fn main() -> Result<()> {
             }
         }
     }
-
     Ok(())
 }
 
@@ -215,31 +242,16 @@ fn process_image(
     Ok(output_img)
 }
 
-fn onnx_session() -> Result<ort::Session, anyhow::Error> {
-    let onnx_model_file = "assets/medium.onnx";
-    let environment = Environment::default().into_arc();
-    let session = SessionBuilder::new(&environment)?
-        .with_optimization_level(GraphOptimizationLevel::Level1)? // Configure model optimization level
-        .with_intra_threads(1)? // Configure the number of threads used for inference
-        .with_execution_providers([
-            // Configure execution providers (e.g., CUDA, CoreML, CPU)
-            ExecutionProvider::CUDA(Default::default()),
-            ExecutionProvider::CoreML(Default::default()),
-            ExecutionProvider::CPU(Default::default()),
-        ])?
-        .with_model_from_file(onnx_model_file)?;
-    Ok(session)
-}
-
 // Function to find the bounding box containing non-transparent pixels
 fn find_alpha_bounds(image: &RgbaImage) -> Option<(u32, u32, u32, u32)> {
     let mut min_x = u32::MAX;
     let mut max_x = 0;
     let mut min_y = u32::MAX;
     let mut max_y = 0;
+    let thres_b = THRESHOLD_BG.get().unwrap();
 
     for (x, y, pixel) in image.enumerate_pixels() {
-        if pixel[3] > 10 {
+        if pixel[3] > *thres_b {
             // Non-transparent pixel
             min_x = min_x.min(x);
             max_x = max_x.max(x);
@@ -251,6 +263,7 @@ fn find_alpha_bounds(image: &RgbaImage) -> Option<(u32, u32, u32, u32)> {
     if min_x <= max_x && min_y <= max_y {
         Some((min_x, min_y, max_x, max_y))
     } else {
+        println!("found NONE {:?}", (min_x, min_y, max_x, max_y));
         None
     }
 }
